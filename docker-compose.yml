@@ -126,9 +126,8 @@ services:
     restart: unless-stopped
 
   certbot:
-    image: certbot/certbot
+    image: certbot/dns-route53
     volumes:
-      - certbot_www:/var/www/certbot
       - certbot_certs:/etc/letsencrypt
     entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h; done"
 
