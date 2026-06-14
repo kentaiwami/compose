@@ -113,6 +113,27 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  # ── cleaner ──
+  delete-sensor-outliers:
+    build: ../cleaner/sensor-api
+    command: ./delete-sensor-outliers
+    environment:
+      DATABASE_URL: sensor:sensor@tcp(sensor-db:3306)/sensordb?parseTime=true
+    depends_on:
+      sensor-db:
+        condition: service_healthy
+    restart: always
+
+  delete-old-data:
+    build: ../cleaner/sensor-api
+    command: ./delete-old-data
+    environment:
+      DATABASE_URL: sensor:sensor@tcp(sensor-db:3306)/sensordb?parseTime=true
+    depends_on:
+      sensor-db:
+        condition: service_healthy
+    restart: on-failure
+
   # ── sensor-detector ──
   sensor-detector:
     build: ../sensor-detector
