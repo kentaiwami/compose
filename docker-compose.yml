@@ -1,0 +1,119 @@
+services:
+  # ── sensor DB ──
+  sensor-db:
+    image: mariadb:11
+    command: --default-time-zone='+09:00'
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: sensordb
+      MARIADB_USER: sensor
+      MARIADB_PASSWORD: sensor
+      TZ: Asia/Tokyo
+    volumes:
+      - sensor_db_data:/var/lib/mysql
+      - ../sensor-api/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  sensor-api:
+    build: ../sensor-api
+    environment:
+      DATABASE_URL: sensor:sensor@tcp(sensor-db:3306)/sensordb?parseTime=true
+      API_KEY: ${SENSOR_API_KEY}
+    ports:
+      - "8080:8080"
+    depends_on:
+      sensor-db:
+        condition: service_healthy
+
+  sensor-view:
+    build: ../sensor-view
+    environment:
+      DATABASE_URL: sensor:sensor@tcp(sensor-db:3306)/sensordb?parseTime=true&loc=Asia%2FTokyo
+      VIEW_PASSWORD: ${VIEW_PASSWORD}
+    ports:
+      - "8081:8080"
+    depends_on:
+      sensor-db:
+        condition: service_healthy
+
+  sensor-realtime-view:
+    build: ../sensor-realtime-view
+    environment:
+      DATABASE_URL: sensor:sensor@tcp(sensor-db:3306)/sensordb?parseTime=true&loc=Asia%2FTokyo
+      VIEW_PASSWORD: ${VIEW_PASSWORD}
+    ports:
+      - "8083:8080"
+    depends_on:
+      sensor-db:
+        condition: service_healthy
+
+  # ── neko ──
+  neko-db:
+    image: mariadb:11
+    command: --default-time-zone='+09:00'
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: nekodb
+      MARIADB_USER: neko
+      MARIADB_PASSWORD: neko
+      TZ: Asia/Tokyo
+    volumes:
+      - neko_db_data:/var/lib/mysql
+      - ../neko/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  neko:
+    build: ../neko
+    environment:
+      DATABASE_URL: neko:neko@tcp(neko-db:3306)/nekodb?parseTime=true
+      VIEW_PASSWORD: ${VIEW_PASSWORD}
+    ports:
+      - "8082:8080"
+    depends_on:
+      neko-db:
+        condition: service_healthy
+
+  # ── aws-cost ──
+  aws-cost-db:
+    image: mariadb:11
+    command: --default-time-zone='+09:00'
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: awscostdb
+      MARIADB_USER: awscost
+      MARIADB_PASSWORD: awscost
+      TZ: Asia/Tokyo
+    volumes:
+      - aws_cost_db_data:/var/lib/mysql
+      - ../aws-cost/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  aws-cost:
+    build: ../aws-cost
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+      MYSQL_DSN: awscost:awscost@tcp(aws-cost-db:3306)/awscostdb
+    depends_on:
+      aws-cost-db:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  sensor_db_data:
+  neko_db_data:
+  aws_cost_db_data:
